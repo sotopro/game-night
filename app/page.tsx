@@ -1,65 +1,247 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Card } from '@/components/ui/Card'
+import { useGameStore } from '@/lib/store'
+import type { Lang } from '@/lib/types'
+
+export default function LobbyPage() {
+  const router = useRouter()
+  const { setMyPlayer, setRoom } = useGameStore()
+
+  const [name, setName] = useState('')
+  const [lang, setLang] = useState<Lang>('es')
+  const [roomCode, setRoomCode] = useState('')
+  const [mode, setMode] = useState<'home' | 'create' | 'join'>('home')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleCreate = async () => {
+    if (!name.trim()) return setError('Ingresa tu nombre / 请输入你的名字')
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', playerName: name.trim(), lang }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      setMyPlayer(data.playerId, lang)
+      setRoom(data.code, data.roomState)
+
+      sessionStorage.setItem('gn_playerId', data.playerId)
+      sessionStorage.setItem('gn_playerName', name.trim())
+      sessionStorage.setItem('gn_playerLang', lang)
+
+      router.push(`/room/${data.code}`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al crear sala')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleJoin = async () => {
+    if (!name.trim()) return setError('Ingresa tu nombre / 请输入你的名字')
+    if (!roomCode.trim()) return setError('Ingresa el codigo / 请输入房间代码')
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'join',
+          code: roomCode.trim().toUpperCase(),
+          playerName: name.trim(),
+          lang,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      setMyPlayer(data.playerId, lang)
+      setRoom(roomCode.trim().toUpperCase(), data.roomState)
+
+      sessionStorage.setItem('gn_playerId', data.playerId)
+      sessionStorage.setItem('gn_playerName', name.trim())
+      sessionStorage.setItem('gn_playerLang', lang)
+
+      router.push(`/room/${roomCode.trim().toUpperCase()}`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al unirse')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Floating emojis background */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {['🎨', '🧠', '🃏', '🎴', '🎮', '⭐'].map((emoji, i) => (
+          <div
+            key={i}
+            className="absolute text-4xl opacity-20 animate-shin-bounce"
+            style={{
+              left: `${15 + i * 15}%`,
+              top: `${10 + (i % 3) * 30}%`,
+              animationDelay: `${i * 0.3}s`,
+              animationDuration: `${2 + i * 0.5}s`,
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+            {emoji}
+          </div>
+        ))}
+      </div>
+
+      {/* Logo */}
+      <div className="text-center mb-8 animate-shin-wiggle relative z-10">
+        <h1 className="font-display text-6xl md:text-7xl text-shin-red leading-none">
+          GAME NIGHT
+        </h1>
+        <h2 className="font-chinese text-3xl md:text-4xl text-shin-blue font-bold mt-1">
+          游戏之夜
+        </h2>
+        <p className="text-sm text-gray-600 mt-2 font-body">
+          Mini juegos bilingues para dos 🎮
+        </p>
+      </div>
+
+      {/* Main card */}
+      <Card variant="result" className="w-full max-w-md relative z-10">
+        {mode === 'home' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block font-bold text-sm mb-1">
+                Tu nombre / 你的名字
+              </label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Daniel / 玉嫦"
+                maxLength={20}
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-sm mb-1">
+                Tu idioma / 你的语言
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setLang('es')}
+                  className={`flex-1 p-3 rounded-lg border-3 border-shin-black text-center font-bold transition-all cursor-pointer
+                    ${lang === 'es' ? 'bg-shin-blue text-white shadow-[4px_4px_0_#1A1A1A] -translate-y-0.5' : 'bg-white hover:-translate-y-1'}`}
+                >
+                  🇻🇪 Espanol
+                </button>
+                <button
+                  onClick={() => setLang('zh')}
+                  className={`flex-1 p-3 rounded-lg border-3 border-shin-black text-center font-bold transition-all cursor-pointer
+                    ${lang === 'zh' ? 'bg-shin-red text-white shadow-[4px_4px_0_#1A1A1A] -translate-y-0.5' : 'bg-white hover:-translate-y-1'}`}
+                >
+                  🇨🇳 中文
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="primary"
+                size="lg"
+                className="flex-1"
+                onClick={() => setMode('create')}
+              >
+                🎮 {lang === 'es' ? 'Crear Sala' : '创建房间'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="lg"
+                className="flex-1"
+                onClick={() => setMode('join')}
+              >
+                🔑 {lang === 'es' ? 'Unirse' : '加入'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'create' && (
+          <div className="space-y-4">
+            <h3 className="font-display text-2xl text-center uppercase">
+              {lang === 'es' ? 'CREAR SALA' : '创建房间'}
+            </h3>
+            <p className="text-center text-sm text-gray-600">
+              {lang === 'es'
+                ? 'Se generara un codigo para compartir'
+                : '将生成一个分享代码'}
+            </p>
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full"
+              onClick={handleCreate}
+              disabled={loading || !name.trim()}
+            >
+              {loading ? '🐶 ...' : lang === 'es' ? '¡Crear!' : '创建！'}
+            </Button>
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => setMode('home')}>
+              ← {lang === 'es' ? 'Volver' : '返回'}
+            </Button>
+          </div>
+        )}
+
+        {mode === 'join' && (
+          <div className="space-y-4">
+            <h3 className="font-display text-2xl text-center uppercase">
+              {lang === 'es' ? 'UNIRSE A SALA' : '加入房间'}
+            </h3>
+            <div>
+              <label className="block font-bold text-sm mb-1">
+                {lang === 'es' ? 'Codigo de sala' : '房间代码'}
+              </label>
+              <Input
+                variant="code"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                placeholder="PANDA"
+                maxLength={5}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="w-full"
+              onClick={handleJoin}
+              disabled={loading || !name.trim() || !roomCode.trim()}
+            >
+              {loading ? '🐶 ...' : lang === 'es' ? '¡Unirse!' : '加入！'}
+            </Button>
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => setMode('home')}>
+              ← {lang === 'es' ? 'Volver' : '返回'}
+            </Button>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 p-2 bg-red-50 border-2 border-shin-red rounded-lg text-shin-red text-sm text-center font-bold">
+            {error}
+          </div>
+        )}
+      </Card>
+
+      <p className="mt-6 text-xs text-gray-400 relative z-10">
+        Game Night 游戏之夜 · v1.0
+      </p>
+    </main>
+  )
 }
