@@ -7,8 +7,8 @@ Estetica visual: Crayon Shin-chan.
 ## Stack
 
 - **Framework:** Next.js 15 (App Router)
-- **Real-time:** Pusher Channels (WebSocket via cloud)
-- **Estado servidor:** Upstash Redis (serverless, HTTP REST)
+- **Real-time:** Sockudo en el VPS (protocolo de Pusher; SDKs `pusher` y `pusher-js`)
+- **Estado servidor:** Redis del VPS (cliente `redis`, claves bajo `gn:`)
 - **Estado cliente:** Zustand
 - **Estilos:** Tailwind CSS 4 + CVA (class-variance-authority)
 - **Deploy:** Vercel
@@ -39,8 +39,8 @@ game-night/
 ├── hooks/                        # usePusher, useTimer
 └── lib/                          # Logica core
     ├── types.ts                  # Tipos TypeScript compartidos
-    ├── redis.ts                  # Cliente Upstash Redis
-    ├── pusher.ts                 # Cliente/servidor Pusher
+    ├── redis.ts                  # Cliente Redis (REDIS_URL)
+    ├── pusher.ts                 # Cliente/servidor Pusher apuntando a Sockudo
     ├── store.ts                  # Zustand store
     ├── gameData.ts               # 383 items bilingues (contenido de juegos)
     └── gameLogic.ts              # processAction() — reducer puro
@@ -57,7 +57,7 @@ Cliente → POST /api/game → Redis (leer estado) → processAction() → Redis
 - **Server-authoritative:** Toda la logica de juego corre en el server (API routes). Los clientes son renderers.
 - **Sin optimistic updates:** El cliente espera el broadcast de Pusher antes de actualizar la UI.
 - **Redis JSON blob:** Cada sala es un unico JSON en Redis con TTL de 24h. No se usan hashes.
-- **Pusher client events:** Los trazos de Pictionary van directo client→Pusher→client sin pasar por el server (ahorro de Redis commands).
+- **Trazos de Pictionary:** pasan por `/api/game` y se difunden sin guardarse en Redis. Sockudo no acepta client events.
 
 ### Eventos Pusher (canal: presence-room-{CODE})
 - `game:state-update` — Estado completo del juego
@@ -120,12 +120,16 @@ Todo el contenido esta en `lib/gameData.ts`:
 ## Environment Variables
 
 ```
-NEXT_PUBLIC_PUSHER_KEY=       # Pusher App Key (client)
-NEXT_PUBLIC_PUSHER_CLUSTER=   # Pusher cluster (client)
-PUSHER_APP_ID=                # Pusher App ID (server only)
-PUSHER_SECRET=                # Pusher Secret (server only)
-UPSTASH_REDIS_REST_URL=       # Upstash Redis URL (server only)
-UPSTASH_REDIS_REST_TOKEN=     # Upstash Redis token (server only)
+NEXT_PUBLIC_PUSHER_KEY=       # App key de Sockudo (cliente; en deploy-build.env)
+NEXT_PUBLIC_PUSHER_HOST=      # Host público de Sockudo (cliente; en deploy-build.env)
+NEXT_PUBLIC_PUSHER_TLS=       # "false" para un Sockudo local sin TLS
+NEXT_PUBLIC_PUSHER_PORT=      # 443 por defecto con TLS, 6001 sin TLS
+PUSHER_APP_ID=                # App ID de Sockudo (solo servidor)
+PUSHER_SECRET=                # Secret de Sockudo (solo servidor)
+PUSHER_HOST=                  # Host interno de Sockudo (solo servidor)
+PUSHER_PORT=                  # 6001 por defecto
+PUSHER_USE_TLS=               # "true" si el servidor habla TLS con Sockudo
+REDIS_URL=                    # rediss://... (solo servidor)
 ```
 
-Nunca exponer PUSHER_SECRET ni UPSTASH_REDIS_REST_TOKEN en el cliente.
+Nunca exponer PUSHER_SECRET ni REDIS_URL en el cliente.
